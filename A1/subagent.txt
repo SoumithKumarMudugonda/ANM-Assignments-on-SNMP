@@ -1,0 +1,50 @@
+#!/usr/bin/perl
+
+use NetSNMP::agent (':all');
+use NetSNMP::ASN;
+use NetSNMP::OID;
+
+
+ 
+sub hello_handler {
+                    my ($handler, $registration_info, $request_info, $requests) = @_;
+                    my $request;
+                    $file = '/tmp/A1/counters.conf';
+                    open(FILE,$file) or die"Cant read file'counters.conf'[$!]\n";
+                    undef $/;
+                    $string=<FILE>;
+                    my%hash= split/[\n ,]/,$string;
+                    $epoch=time();
+                    
+                    for($request = $requests; $request; $request = $request->next()) 
+                       {
+                         my $oid = $request->getOID();
+                         my @oid_array = split/[.]/,$oid;
+                         my $req_oid = $oid_array[-1];
+                         my $key=$req_oid-1;
+                
+                   
+                         if ($request_info->getMode() == MODE_GET) 
+                            {
+                             if($oid == new NetSNMP::OID("1.3.6.1.4.1.4171.40.1"))
+                                {
+                                  $request->setValue(ASN_COUNTER, $epoch);
+                                 }
+                             elsif($oid > new NetSNMP::OID("1.3.6.1.4.1.4171.40.1")) 
+                                {
+                                  
+                                 
+                                  if(exists($hash{$key}))
+                                    {
+                                      $counter_val=($hash{$key})*($epoch);
+                                      $request->setValue(ASN_COUNTER, $counter_val);
+                                    }
+
+                                  }    
+                                 }
+                               }                               
+                          }
+                             
+my $agent = new NetSNMP::agent();
+$agent->register("subagent", "1.3.6.1.4.1.4171.40", \&hello_handler);
+

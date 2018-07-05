@@ -1,0 +1,111 @@
+#!/usr/bin/perl
+use DBI;
+use Net::SNMP;
+use NetSNMP::TrapReceiver;
+#use warnings;
+my $fqdn;
+my $sts;
+my $time;
+my $rv;
+my $qury;
+my $sth;
+my $stmt;
+my $ret;
+my $q;
+my $driver   = "SQLite";
+my $db_name = "anm.db";
+my $dbd = "DBI:$driver:dbname=$db_name";
+my $username = "";
+my $password = "";
+my $dbh = DBI->connect($dbd, $username, $password, { RaiseError => 1 })
+                      or die $DBI::errstr;
+$stmt = qq(CREATE TABLE IF NOT EXISTS A42
+             (ID INTEGER PRIMARY KEY     AUTOINCREMENT,
+              Device_name	TEXT    NOT NULL,
+              new_status	INT     NOT NULL,
+              new_time	INT     NOT NULL,
+              old_status	INT     NOT NULL,
+              old_time	INT     NOT NULL););
+$ret = $dbh->do($stmt);
+sub my_receiver {
+      
+      foreach my $x (@{$_[1]}) { 
+	  if("$x->[0]" eq '.1.3.6.1.4.1.41717.10.1'){
+              $fqdn = $x->[1];
+              $fqdn=~ s/\"//gs;
+              
+           }
+	  if("$x->[0]" eq '.1.3.6.1.4.1.41717.10.2'){
+              $sts=$x->[1];
+              $time=time();       
+          }
+      }
+#print "$sts \n";
+
+$sth = $dbh->prepare("SELECT Device_name FROM A42 WHERE Device_name='$fqdn'");
+$sth->execute();
+if ($sth->fetchrow_arrayref()) {
+     $qury = qq(UPDATE A42 set new_status='$sts',new_time='$time',old_status=new_status,old_time=new_time WHERE Device_name='$fqdn');
+     $rv=$dbh->do($qury) or die $DBI::errstr; 
+     #print "updated\n";  
+}else{
+    $q =qq(INSERT INTO A42(Device_name,new_status,new_time,old_status,old_time)VALUES('$fqdn','$sts','$time','$sts','$time'););
+    $ret = $dbh->do($q);
+    #print "inserted \n";
+} 
+@dan=();
+@fail=();
+my $sth = $dbh->prepare('SELECT Device_name,new_time,old_status,old_time FROM A42 WHERE new_status=? AND old_status!=?');
+$sth->execute(2,3);
+my $k=1;
+while(my @row=$sth->fetchrow_array){
+
+push (@dan,'1.3.6.1.4.1.41717.30.'.($k),OCTET_STRING,$row[0]);
+push (@dan,'1.3.6.1.4.1.41717.30.'.($k+1),TIMETICKS,$row[1]);
+push (@dan,'1.3.6.1.4.1.41717.30.'.($k+2),INTEGER,$row[2]);
+push (@dan,'1.3.6.1.4.1.41717.30.'.($k+3),TIMETICKS,$row[3]);
+$k=$k+4;
+
+}
+my $r = $dbh->prepare('SELECT Device_name,new_time,old_status,old_time FROM A42 WHERE new_status=?');
+$r->execute(3);
+while(my @g=$r->fetchrow_array){
+
+push (@fail,'1.3.6.1.4.1.41717.20.1',OCTET_STRING,$g[0]);
+push (@fail,'1.3.6.1.4.1.41717.20.2',TIMETICKS,$g[1]);
+push (@fail,'1.3.6.1.4.1.41717.20.3',INTEGER,$g[2]);
+push (@fail,'1.3.6.1.4.1.41717.20.4',TIMETICKS,$g[3]);
+}  
+push (@fail,@dan);
+#print "@dan\n";
+my $x = $dbh->prepare('SELECT ip,port,community FROM A4 WHERE id=(SELECT MAX(id) FROM A4)');
+$x->execute();
+while(my @t=$x->fetchrow_array){
+#print "$t[0] \n";
+my ($session, $error) = Net::SNMP->session(
+                           -hostname      => $t[0],
+                           -port          => $t[1],
+                           -community     => $t[2],
+			);
+@dan=('1.3.6.1.4.1.41717.10.1',OCTET_STRING,'bth.se');
+print "@fail \n";
+my $result = $session->trap(
+      -varbindlist => \@fail,
+   );
+if (!defined $result) {
+      printf "ERROR: %s.\n", $session->error();
+      $session->close();
+      exit 1;
+   }
+else{
+print "trap sent\n";
+}
+
+  } 
+ 
+
+}
+NetSNMP::TrapReceiver::register("all", \&my_receiver) || 
+warn "failed to register our perl trap handler\n";
+print STDERR "Loaded the example perl snmptrapd handler\n";
+ 

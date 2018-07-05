@@ -1,0 +1,29 @@
+<?php
+include('config.php');
+#   class MyDB extends SQLite3 {
+ #     function __construct() {
+ #        $this->open(''anm.db'');
+ #     }
+ #  }
+   
+   $db = new MyDB();
+   if(!$db) {
+      echo $db->lastErrorMsg();
+   } 
+  $exists="False";
+   $sql =<<<EOF
+      SELECT * FROM A42 ;
+EOF;
+
+   $ret = $db->query($sql);
+   while($row = $ret->fetchArray(SQLITE3_ASSOC) ) {
+      $exists="True";
+      echo $row['Device_name']." | ".$row['new_status']." | ".$row['new_time']." | ".$row['old_status']." | ".$row['old_time']."\n";
+	
+     
+   }
+   if ($exists!="True"){
+       echo "FALSE";
+}	
+   $db->close();
+?>

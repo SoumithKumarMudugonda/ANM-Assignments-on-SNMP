@@ -1,0 +1,28 @@
+<?php
+include('config.php');
+
+#   class MyDB extends SQLite3 {
+ #     function __construct() {
+ #        $this->open(''anm.db'');
+   #   }
+ #  }
+   
+   $db = new MyDB();
+   if(!$db) {
+      echo $db->lastErrorMsg();
+   } 
+  $exists="False";
+   $sql =<<<EOF
+      SELECT * FROM A4 WHERE id=(SELECT MAX(id) FROM A4) ;
+EOF;
+
+   $ret = $db->query($sql);
+   while($row = $ret->fetchArray(SQLITE3_ASSOC) ) {
+      $exists="True";
+      echo "$row[community]@$row[ip]:$row[port]";
+   }
+   if ($exists!="True"){
+       echo "FALSE";
+}	
+   $db->close();
+?>

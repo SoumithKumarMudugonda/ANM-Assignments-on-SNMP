@@ -1,0 +1,32 @@
+<?php
+include('config.php');
+
+#   class MyDB extends SQLite3 {
+#      function __construct() {
+#         $this->open(''anm.db'');
+#      }
+#   }'''
+   
+   $db = new MyDB();   
+   
+$sql =<<<EOF
+      CREATE TABLE IF NOT EXISTS A4
+      (id	INTEGER	PRIMARY KEY	AUTOINCREMENT,
+      ip	STRING	NOT NULL,
+      port	INT	NOT NULL,
+      community	CHAR(50)	NOT NULL);
+      
+EOF;
+$ret = $db->exec($sql);
+  $sql =<<<EOF
+      INSERT INTO A4 (ip,port,community)
+      VALUES ("$_GET[ip]",$_GET[port],"$_GET[community]");
+EOF;
+$ret = $db->exec($sql);
+if(!$ret) {
+      echo "FALSE";
+   } else {
+      echo "OK";
+   }
+   $db->close();
+?>
